@@ -1,0 +1,13 @@
+{
+  "name": "taskboard-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Zero-dependency JSON API used by the optional HttpTaskRepository.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">= 20"
+  }
+}
