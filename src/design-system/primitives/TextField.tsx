@@ -92,7 +92,9 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(
             borderColor,
             backgroundColor: theme.colors.surface,
             paddingHorizontal: theme.spacing.md,
-            justifyContent: 'center',
+            // Single-line inputs centre their text; a multiline field has to
+            // start at the top or the first line floats in the middle of the box.
+            justifyContent: multiline ? 'flex-start' : 'center',
             minHeight: minHeight ?? (multiline ? 88 : 44),
             // A spread shadow with no blur draws a crisp focus ring that
             // renders identically on iOS and in the desktop build.

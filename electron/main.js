@@ -15,6 +15,31 @@ const isDev = Boolean(DEV_SERVER_URL);
 /** @type {BrowserWindow | null} */
 let mainWindow = null;
 
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Waits for the Vite dev server by simply retrying the load.
+ *
+ * Electron and Vite start in parallel, and Vite usually wins — but not
+ * always. Retrying here rather than gating the launch on an external
+ * port-waiter keeps the dev script to two processes and removes a dependency
+ * that can hang without ever timing out.
+ */
+const loadDevServer = async (window, url, attempts = 60) => {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await window.loadURL(url);
+      return;
+    } catch (error) {
+      if (attempt === attempts) {
+        console.error(`[electron] dev server never came up at ${url}`, error);
+        return;
+      }
+      await delay(500);
+    }
+  }
+};
+
 const createWindow = () => {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -35,7 +60,23 @@ const createWindow = () => {
     },
   });
 
-  mainWindow.once('ready-to-show', () => mainWindow?.show());
+  /*
+   * The window starts hidden so the first paint is never a white flash.
+   * `ready-to-show` is the usual signal to reveal it, but it does not always
+   * fire when the renderer's first load fails and is retried — which is
+   * exactly what happens while the dev server is still warming up. Revealing
+   * through one idempotent function, called from both paths, means the window
+   * can never end up stuck invisible.
+   */
+  const reveal = () => {
+    if (mainWindow && !mainWindow.isVisible()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  };
+
+  mainWindow.once('ready-to-show', reveal);
+  mainWindow.webContents.once('did-finish-load', reveal);
 
   // External links open in the user's browser, never inside the app shell.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -44,9 +85,11 @@ const createWindow = () => {
   });
 
   if (isDev) {
-    void mainWindow.loadURL(DEV_SERVER_URL);
+    void loadDevServer(mainWindow, DEV_SERVER_URL).then(reveal);
   } else {
-    void mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+    void mainWindow
+      .loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
+      .then(reveal);
   }
 
   mainWindow.on('closed', () => {

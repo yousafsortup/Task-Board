@@ -116,7 +116,17 @@ export const useTaskBoard = () => {
   }, []);
 
   const closeComposer = useCallback(() => setComposerOpen(false), []);
-  const closeDetail = useCallback(() => setDetailOpen(false), []);
+
+  /**
+   * Dismissing the detail sheet also drops the selection: where the sheet is
+   * used there is no detail pane, so a highlighted row would be pointing at
+   * something the user can no longer see. On a wide window the pane stays put
+   * and this is never called.
+   */
+  const closeDetail = useCallback(() => {
+    setDetailOpen(false);
+    actions.selectTask(null);
+  }, [actions]);
 
   return {
     // state

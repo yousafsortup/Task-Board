@@ -66,8 +66,13 @@ export const BoardHeader = ({
         {isCompact ? (
           <>
             <Text variant="display">Task Board</Text>
-            <Text variant="caption" color="textTertiary">
-              {`${formatDayHeadline()} · ${remainingCopy(counts)}`}
+            {/*
+              The date is dropped on a phone. There is only room for one line
+              beside the controls, and "3 tasks left" is the part that earns
+              its place — adapting the *content*, not just the box it sits in.
+            */}
+            <Text variant="caption" color="textTertiary" numberOfLines={1}>
+              {remainingCopy(counts)}
             </Text>
           </>
         ) : (
