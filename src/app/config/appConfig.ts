@@ -1,23 +1,30 @@
 /**
  * Application configuration.
  *
- * The value that matters here is `dataSource`. Flipping it to `'http'` swaps
- * every read and write in the app over to the Dockerised API in `server/`
- * without touching a single component, store or domain file — that is the
- * whole point of the repository port.
+ * The value that matters is `dataSource`. Setting it to `'http'` swaps every
+ * read and write in the app over to the API in `server/` without touching a
+ * single component, store or domain file — that is what the repository port
+ * is for.
+ *
+ *   TASKBOARD_DATA_SOURCE=http npm run desktop
+ *   TASKBOARD_DATA_SOURCE=http npm run ios
+ *
+ * The reads below are deliberately *static* member accesses: that is the only
+ * form Babel's inline-env plugin (Metro) and Vite's `define` (desktop) can
+ * both substitute at build time.
  */
 export type DataSource = 'local' | 'http';
 
-const readEnv = (key: string): string | undefined => {
+const env = (() => {
   try {
-    return typeof process !== 'undefined' ? process.env?.[key] : undefined;
+    return {
+      dataSource: process.env.TASKBOARD_DATA_SOURCE,
+      apiBaseUrl: process.env.TASKBOARD_API_URL,
+    };
   } catch {
-    return undefined;
+    return { dataSource: undefined, apiBaseUrl: undefined };
   }
-};
-
-const parseDataSource = (value: string | undefined): DataSource =>
-  value === 'http' ? 'http' : 'local';
+})();
 
 export interface AppConfig {
   readonly dataSource: DataSource;
@@ -26,7 +33,7 @@ export interface AppConfig {
 }
 
 export const appConfig: AppConfig = {
-  dataSource: parseDataSource(readEnv('TASKBOARD_DATA_SOURCE')),
-  apiBaseUrl: readEnv('TASKBOARD_API_URL') ?? 'http://localhost:4000',
+  dataSource: env.dataSource === 'http' ? 'http' : 'local',
+  apiBaseUrl: env.apiBaseUrl ?? 'http://localhost:4000',
   storageNamespace: 'taskboard',
 };

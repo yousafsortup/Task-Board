@@ -35,11 +35,17 @@ export default defineConfig(({ mode }) => ({
   },
 
   define: {
-    // React Native's development flag, and a `process.env` shim for libraries
-    // that expect Node globals.
+    // React Native's development flag, plus a `process.env` shim carrying the
+    // handful of variables the app is allowed to read. This is the desktop
+    // half of the same switch Babel performs for Metro.
     __DEV__: JSON.stringify(mode !== 'production'),
     global: 'globalThis',
-    'process.env': {},
+    'process.env': JSON.stringify({
+      NODE_ENV: mode,
+      TASKBOARD_DATA_SOURCE: process.env.TASKBOARD_DATA_SOURCE ?? 'local',
+      TASKBOARD_API_URL:
+        process.env.TASKBOARD_API_URL ?? 'http://localhost:4000',
+    }),
   },
 
   optimizeDeps: {

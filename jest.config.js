@@ -5,6 +5,9 @@
 module.exports = {
   preset: '@react-native/jest-preset',
   setupFiles: ['<rootDir>/jest.setup.js'],
+  // The integration suite renders the whole app; on a cold Babel cache the
+  // first render can exceed Jest's 5s default.
+  testTimeout: 20000,
   testMatch: ['<rootDir>/__tests__/**/*.test.ts', '<rootDir>/__tests__/**/*.test.tsx'],
   transformIgnorePatterns: [
     'node_modules/(?!(?:@react-native|react-native|react-native-safe-area-context|zustand)/)',
