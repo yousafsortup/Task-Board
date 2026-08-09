@@ -36,6 +36,44 @@ const createRepository = (fetchFn: FetchMock) =>
     fetchFn: fetchFn as unknown as typeof fetch,
   });
 
+describe('HttpTaskRepository — default transport', () => {
+  /**
+   * Regression test for a bug that only appeared in a browser.
+   *
+   * Storing the global `fetch` on an instance field and invoking it as
+   * `this.fetchFn(...)` re-binds its receiver to the repository. Node does not
+   * care; browsers throw "Illegal invocation", so the desktop build failed
+   * every request while every mocked test still passed.
+   *
+   * The stub below reproduces the browser's rule exactly.
+   */
+  it('calls the global fetch with the global as its receiver', async () => {
+    const originalFetch = globalThis.fetch;
+    const calls: string[] = [];
+
+    globalThis.fetch = function strictFetch(this: unknown, input: RequestInfo | URL) {
+      if (this !== globalThis && this !== undefined) {
+        throw new TypeError(
+          "Failed to execute 'fetch' on 'Window': Illegal invocation",
+        );
+      }
+      calls.push(String(input));
+      return Promise.resolve(jsonResponse([]));
+    } as unknown as typeof fetch;
+
+    try {
+      const repository = new HttpTaskRepository({
+        baseUrl: 'http://localhost:4000',
+      });
+
+      await expect(repository.findAll()).resolves.toEqual([]);
+      expect(calls).toEqual(['http://localhost:4000/tasks']);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
 describe('HttpTaskRepository', () => {
   it('lists tasks from GET /tasks', async () => {
     const fetchFn = createFetchMock(async () =>

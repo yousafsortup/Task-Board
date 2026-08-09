@@ -33,7 +33,13 @@ export class HttpTaskRepository implements TaskRepository {
 
   constructor(deps: HttpTaskRepositoryDeps) {
     this.baseUrl = deps.baseUrl.replace(/\/+$/, '');
-    this.fetchFn = deps.fetchFn ?? fetch;
+    /*
+     * `fetch` must keep its original receiver. Storing the bare global on an
+     * instance field and calling it as `this.fetchFn(...)` re-binds `this` to
+     * the repository, which browsers reject with "Illegal invocation" — so it
+     * is bound to the global object here.
+     */
+    this.fetchFn = deps.fetchFn ?? globalThis.fetch.bind(globalThis);
     this.timeoutMs = deps.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   }
 
