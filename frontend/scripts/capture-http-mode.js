@@ -19,8 +19,10 @@ const { app, BrowserWindow } = require('electron');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
+// `docs/` lives at the repository root, one level above `frontend/`.
 const OUTPUT = path.join(
   __dirname,
+  '..',
   '..',
   'docs',
   'screenshots',

@@ -19,7 +19,8 @@ const {
   buildStoragePayload,
 } = require('./sampleTasks');
 
-const OUTPUT_DIR = path.join(__dirname, '..', 'docs', 'screenshots');
+// `docs/` lives at the repository root, one level above `frontend/`.
+const OUTPUT_DIR = path.join(__dirname, '..', '..', 'docs', 'screenshots');
 const BUNDLE = path.join(__dirname, '..', 'dist', 'index.html');
 
 /** Deterministic "now" so relative timestamps read the same in every run. */

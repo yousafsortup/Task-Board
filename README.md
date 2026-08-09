@@ -11,7 +11,7 @@ persists locally between restarts.
 | **Framework** | React Native 0.86.2 (TypeScript) |
 | **Platform targets run** | iOS (simulator, native build) · macOS desktop (Electron + react-native-web) |
 | **Persistence** | AsyncStorage on iOS · `localStorage` on desktop — both behind one interface |
-| **Tests** | 81 passing (`npm test`) |
+| **Tests** | 82 passing (`npm test`) |
 
 ---
 
@@ -26,11 +26,15 @@ nvm use
 
 If you don't have that version yet: `nvm install 22.11.0`.
 
-Then install dependencies once, from the project root:
+The app lives in `frontend/`, so install its dependencies there:
 
 ```bash
+cd frontend
 npm install
 ```
+
+> Every command in sections 2, 3 and 5 runs from `frontend/`.
+> Section 4 (the API) runs from `server/`.
 
 ---
 
@@ -39,7 +43,7 @@ npm install
 This is the quickest way to see the app.
 
 ```bash
-npm run desktop
+cd frontend && npm run desktop
 ```
 
 A real Electron window opens. **Drag its edge to make it narrow** — the layout
@@ -52,10 +56,10 @@ reacts to window size rather than to which OS it's on.
 ### Want an actual installable app instead?
 
 ```bash
-npm run desktop:build
+cd frontend && npm run desktop:build
 ```
 
-This writes a `.dmg` installer into `release/`. (On Windows it produces an
+This writes a `.dmg` installer into `frontend/release/`. (On Windows it produces an
 `.exe` installer, on Linux an AppImage — same command.)
 
 ---
@@ -65,10 +69,10 @@ This writes a `.dmg` installer into `release/`. (On Windows it produces an
 Requires Xcode. Install the native dependencies once:
 
 ```bash
-cd ios && pod install && cd ..
+cd frontend/ios && pod install && cd ..
 ```
 
-Then build and run:
+Then build and run (from `frontend/`):
 
 ```bash
 npm run ios
@@ -85,7 +89,7 @@ app connects to the wrong server. Two ways out:
 **Option A — build a self-contained app (no bundler needed):**
 
 ```bash
-npm run ios -- --mode Release
+cd frontend && npm run ios -- --mode Release
 ```
 
 The JavaScript is bundled into the app, so it doesn't need Metro at all. This
@@ -127,7 +131,7 @@ You should see `{"status":"ok","tasks":0}`.
 
 ### Step 2 — point the app at it
 
-From the project root, run either target with one environment variable:
+From `frontend/`, run either target with one environment variable:
 
 ```bash
 TASKBOARD_DATA_SOURCE=http npm run desktop
@@ -138,7 +142,7 @@ TASKBOARD_DATA_SOURCE=http npm run ios
 ```
 
 The app now reads and writes over HTTP instead of local storage. **No app code
-changes** — the switch happens in `src/app/services/createServices.ts`, which
+changes** — the switch happens in `frontend/src/app/services/createServices.ts`, which
 picks a different implementation of the same `TaskRepository` interface.
 
 Here it is working. Both tasks below were created **only** through the
@@ -185,7 +189,8 @@ prove the seam, not to showcase a framework.
 ## 5. Tests and checks
 
 ```bash
-npm test          # 81 tests
+cd frontend
+npm test          # 82 tests
 npm run typecheck # TypeScript, no errors
 npm run verify    # typecheck + lint + tests together
 ```
@@ -239,9 +244,10 @@ Wide enough, and the list becomes a two-column grid:
 
 ![Desktop ultrawide](docs/screenshots/desktop-05-ultrawide-dark.png)
 
-> Reproduce them yourself: `npx electron scripts/capture-desktop.js` (after
-> `npm run web:build`), and `node scripts/seed-ios-simulator.js` to put the
-> same sample board on a booted simulator.
+> Reproduce them yourself, from `frontend/`:
+> `npm run web:build && npx electron scripts/capture-desktop.js`, and
+> `node scripts/seed-ios-simulator.js` to put the same sample board on a
+> booted simulator.
 
 ---
 
@@ -296,6 +302,34 @@ section 4 above works without touching app code.
 
 ## 8. Project structure
 
+The repository holds two independent projects side by side, each with its own
+`package.json` and its own lifecycle:
+
+```
+taskboard/
+├── README.md            You are here.
+├── docs/                Architecture notes and screenshots.
+│
+├── frontend/            The app — iOS, Android and desktop.
+│   ├── src/             ← see below
+│   ├── ios/  android/   Native projects.
+│   ├── electron/        Desktop shell (main + preload process).
+│   ├── scripts/         Screenshot capture and simulator seeding.
+│   ├── __tests__/       Test suites.
+│   └── package.json
+│
+└── server/              Optional Dockerised API (section 4).
+    ├── server.js        Zero-dependency Node service.
+    ├── Dockerfile
+    └── package.json
+```
+
+They are deliberately *not* wired together with workspaces: the server shares
+no code with the app, so a plain folder split gives the same separation with
+none of the monorepo tooling.
+
+Inside `frontend/src`:
+
 ```
 src/
 ├── domain/          Business rules. Plain TypeScript — no React, no I/O.
@@ -306,15 +340,11 @@ src/
 ├── responsive/      Breakpoints and the hook that drives layout from size.
 ├── shared/          Small cross-cutting utilities.
 └── app/             Composition root: wires everything together.
-
-server/              Optional Dockerised API (section 4).
-scripts/             Screenshot capture and simulator seeding.
-__tests__/           Test suites.
 ```
 
 Dependencies point inwards: `features` and `data` both depend on `domain`, and
-`domain` depends on nothing. That's what keeps the business rules testable
-without a simulator and identical across platforms.
+`domain` depends on nothing — not even React. That's what keeps the business
+rules testable without a simulator and identical across platforms.
 
 ---
 
@@ -336,7 +366,7 @@ Worth being upfront about:
   phone) rather than inline in the list.
 - **The screenshots are seeded** with a fixed sample board so the iOS and
   desktop shots show identical content and the comparison is purely about
-  layout. The seeding scripts are in `scripts/`.
+  layout. The seeding scripts are in `frontend/scripts/`.
 
 ---
 
@@ -345,7 +375,7 @@ Worth being upfront about:
 | Bonus | Status |
 |---|---|
 | Dark mode | ✅ Full light/dark themes, plus an "Auto" mode that follows the OS |
-| Widget tests for filter + add/complete | ✅ 81 tests, including UI tests at three window sizes |
+| Widget tests for filter + add/complete | ✅ 82 tests, including UI tests at three window sizes |
 | Offline-friendly repository layer | ✅ The `TaskRepository` port — swapping to an API is one line |
 | Local API instead of local storage, Dockerised | ✅ `server/` — zero-dependency Node API, Dockerfile + compose |
 | Installable desktop build | ✅ `npm run desktop:build` produces a `.dmg` |
