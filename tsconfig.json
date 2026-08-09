@@ -1,0 +1,30 @@
+{
+  "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    "types": ["jest"],
+    /*
+     * The React Native preset ships an ES2019 library set with no DOM, which
+     * is right for the native targets but leaves the desktop adapters
+     * (`*.web.ts`, `index.web.tsx`) with no `window`, `document` or
+     * `KeyboardEvent`. One shared checker has to understand both, so DOM is
+     * added here — `skipLibCheck` keeps the two global namespaces from
+     * arguing with each other.
+     */
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "skipLibCheck": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": false,
+    "verbatimModuleSyntax": false
+  },
+  "include": ["**/*.ts", "**/*.tsx", "electron/**/*.js"],
+  "exclude": [
+    "**/node_modules",
+    "**/Pods",
+    "dist",
+    "release",
+    "android",
+    "ios"
+  ]
+}
