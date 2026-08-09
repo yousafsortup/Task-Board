@@ -89,7 +89,7 @@ export const BoardHeader = ({
       </View>
 
       <Button
-        label={TASK_SORT_LABELS[sortOrder]}
+        label={`Sort: ${TASK_SORT_LABELS[sortOrder]}`}
         variant="ghost"
         size="sm"
         onPress={cycleSort}
