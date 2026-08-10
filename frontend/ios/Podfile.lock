@@ -2156,7 +2156,7 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   AsyncStorage: dba9d05b9aa34413760ea5a74f63a7e7f9fddf73
   FBLazyVector: 3c3be9a019176b5699455f7f66c5444b78a411c6
-  hermes-engine: 7da56218f9deed3885498de15fc623a00c743ca7
+  hermes-engine: 5a4ef4cfe736ea8ac19024f3eceb574172758052
   RCTDeprecation: bccb6545c26db881ecddfd83a3f9ea82aba1605f
   RCTRequired: b2f74764d596fc0051f00fee94b49bf41a6f7f5a
   RCTSwiftUI: c6d6a31b849b9dfa64c33b55dc91ac15dd55774c

@@ -1,4 +1,4 @@
-# Task Board — Cross-Platform Take-Home
+# Task Board — Cross-Platform
 
 A small task board built with **one React Native codebase** that runs on a
 phone and on a desktop, and genuinely changes shape between them.
