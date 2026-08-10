@@ -4,12 +4,44 @@ The brief asks one question: can a single codebase genuinely work on a phone
 *and* a desktop — layout, interaction and data handling actually adapting,
 rather than a phone screen stretched wide.
 
-This document explains how the code answers that, and why it is arranged the
-way it is.
+This repository answers that with **two independent projects** side by side.
+They share a contract (the task HTTP API), not code:
+
+```
+taskboard/
+├── frontend/   The app — iOS, Android, and desktop (Electron)
+└── server/     Optional zero-dependency Node API
+```
+
+Each has its own `package.json` and lifecycle. The rest of this document
+explains them separately, then how they connect.
 
 ---
 
-## 1. The shape of the codebase
+# Part A — Frontend
+
+The app lives in `frontend/`. One React Native TypeScript tree targets iOS,
+Android, and desktop (Electron + `react-native-web`). Native shells and
+bundlers sit at the project root; shared product code sits in `src/`.
+
+## A1. Top-level shape
+
+```
+frontend/
+├── src/             Shared application code (all platforms)
+├── ios/             Native iOS host (Xcode, Pods)
+├── android/         Native Android host (Gradle)
+├── electron/        Desktop shell only (main + preload)
+├── index.js         Metro / native entry
+├── index.web.tsx    Vite / web entry
+├── index.html       DOM shell for web / Electron
+├── vite.config.ts   Desktop bundler
+├── metro.config.js  Mobile bundler
+├── __tests__/       Jest suites
+└── scripts/         Screenshot capture and simulator seeding
+```
+
+Inside `src/`:
 
 ```
 src/
@@ -43,14 +75,14 @@ Dependencies point **inwards**:
 └──────────────┘
 ```
 
-`domain` depends on nothing. That is the whole trick: the rules that decide
-what a task *is*, what "active" means and how the list is ordered are ordinary
-functions over plain data. They run identically on iOS, on the desktop, and in
-Jest — because they have no idea any of those exist.
+`domain` depends on nothing. The rules that decide what a task *is*, what
+"active" means and how the list is ordered are ordinary functions over plain
+data. They run identically on iOS, Android, the desktop, and in Jest —
+because they have no idea any of those exist.
 
 ---
 
-## 2. How the layout adapts
+## A2. How the layout adapts
 
 ### It responds to size, never to the operating system
 
@@ -122,25 +154,26 @@ simply never fires them on touch, so this needs no platform check either.
 
 ---
 
-## 3. How the platform split is contained
+## A3. How the platform split is contained
 
-The **entire** per-platform surface of this project is three files:
+The **entire** per-platform surface of the app is a handful of edge files:
 
 ```
 data/storage/keyValueStore.ts        → AsyncStorage      (iOS / Android)
 data/storage/keyValueStore.web.ts    → localStorage      (desktop)
-shared/hooks/useKeyboardShortcut.ts  → no-op on native, real on desktop
+shared/hooks/useKeyboardShortcut.ts  → no-op on native
+shared/hooks/useKeyboardShortcut.web.ts → real bindings on desktop
 ```
 
-Both are *driven adapters* — the outermost edge, where bytes leave the
-application. Everything above that line is byte-identical on both targets.
+Both storage files are *driven adapters* — the outermost edge, where bytes
+leave the application. Everything above that line is byte-identical on every
+target.
 
-The bundler picks the right file by extension (Metro prefers `.native.*`, Vite
-is configured to prefer `.web.*`). No code branches; the module graph differs,
-the application does not.
+The bundler picks the right file by extension (Metro for native, Vite
+configured to prefer `.web.*` on desktop). No code branches; the module graph
+differs, the application does not.
 
-The only other platform-shaped file is the entry point, and the difference is
-one line:
+Entry points differ by one line:
 
 ```js
 // index.js  (iOS / Android)          // index.web.tsx  (desktop)
@@ -150,9 +183,24 @@ AppRegistry.registerComponent(…)      AppRegistry.registerComponent(…)
 
 A native host starts the surface itself; a browser has to be handed a DOM node.
 
+### How each target boots
+
+| Target | Bundler | Entry | Host |
+|---|---|---|---|
+| iOS / Android | Metro | `index.js` | Native project under `ios/` / `android/` |
+| Desktop (dev) | Vite + Electron | `index.html` → `index.web.tsx` | `electron/main.js` loads the Vite URL |
+| Desktop (packaged) | Vite build → `dist/` | same web entry | Electron loads `dist/index.html` |
+
+`electron/` owns only the window. No product logic lives in the main process;
+preload exposes a minimal bridge. `npm run desktop:build` produces a macOS
+`.dmg` or a Windows NSIS `.exe` depending on the host OS.
+
+Android Metro is started on port **8083** (`npm run android`) so it stays clear
+of other React Native projects still using 8081.
+
 ---
 
-## 4. Data flow
+## A4. Data flow inside the app
 
 ```
   Component
@@ -168,6 +216,10 @@ A native host starts the surface itself; a browser has to be handed a DOM node.
    LocalTaskRepository    HttpTaskRepository   InMemoryTaskRepository
      (KeyValueStore)         (fetch → API)          (tests)
 ```
+
+`createServices.ts` is the only file that names concrete implementations. It
+reads `appConfig` and builds either a local or HTTP repository, plus a
+preferences store on the same key/value adapter.
 
 ### Why the store is a factory, not a singleton
 
@@ -204,27 +256,7 @@ reads the bare-array format an earlier version would have written.
 
 ---
 
-## 5. Swapping local storage for a real API
-
-`createServices.ts` is the only file that names concrete implementations:
-
-```ts
-const taskRepository =
-  config.dataSource === 'http'
-    ? new HttpTaskRepository({ baseUrl: config.apiBaseUrl })
-    : new LocalTaskRepository({ store: keyValueStore });
-```
-
-That is the entire change. Run the API in `server/`, set
-`TASKBOARD_DATA_SOURCE=http`, and every screen is reading and writing over the
-network — with no edit to any component, store, or domain file.
-
-This was verified end to end: tasks created only through the containerised API
-(via `curl`, with local storage cleared) render in the desktop app.
-
----
-
-## 6. Theming
+## A5. Theming
 
 Components never name a colour. They ask for a semantic role —
 `colors.textSecondary`, `colors.surfaceHover` — and the active theme supplies
@@ -241,9 +273,9 @@ inherit theme colours for free.
 
 ---
 
-## 7. Testing strategy
+## A6. Testing strategy
 
-81 tests, arranged by how much they cost to run:
+82 tests, arranged by how much they cost to run:
 
 | Layer | What is asserted | Needs |
 |---|---|---|
@@ -267,7 +299,7 @@ mock-everything test suite leaves open.
 
 ---
 
-## 8. Trade-offs
+## A7. Frontend trade-offs
 
 **Electron rather than a native macOS target.** `react-native-macos` supports
 React Native only up to 0.81, and this project is on 0.86. Electron plus
@@ -284,3 +316,152 @@ mean shipping a router to render a single route.
 **Hand-built icons.** An icon font needs per-platform asset linking and
 `react-native-svg` needs a native module plus a web shim. For the eight glyphs
 this app uses, composed views were the smaller and more portable answer.
+
+---
+
+# Part B — Server
+
+The API lives in `server/`. It is **optional**. By default the frontend stores
+tasks locally (AsyncStorage / `localStorage`). The server exists to prove that
+swapping local storage for a real backend is a one-line change in the app, not
+a rewrite.
+
+It is a zero-dependency Node process — `node:http` only, no Express, no ORM.
+
+## B1. Top-level shape
+
+```
+server/
+├── server.js            Entire API in one file
+├── package.json         `npm start` → node server.js
+├── Dockerfile           Node 22 Alpine image
+├── docker-compose.yml   Port 4000 + named volume for data
+└── data/                Created at runtime (gitignored)
+    └── tasks.json       Plain-Node persistence path
+```
+
+There is no shared TypeScript package with the frontend. The contract is the
+HTTP surface below; the frontend's `HttpTaskRepository` is written to match it.
+
+---
+
+## B2. HTTP surface
+
+Listens on `0.0.0.0:${PORT}` (default **4000**).
+
+| Method | Path | Purpose |
+|---|---|---|
+| `OPTIONS` | any | CORS preflight → `204` |
+| `GET` | `/health` | Liveness — `{ status, tasks }` |
+| `GET` | `/tasks` | List every task |
+| `POST` | `/tasks` | Create — `{ title, note? }` → `201` |
+| `PATCH` | `/tasks/:id` | Update title, note, or completion |
+| `DELETE` | `/tasks/:id` | Delete one → `204` |
+| `DELETE` | `/tasks?filter=completed` | Clear completed → `{ removed }` |
+
+Task shape on the wire:
+
+```json
+{
+  "id": "…",
+  "title": "…",
+  "note": "… or null",
+  "completed": false,
+  "createdAt": 0,
+  "updatedAt": 0,
+  "completedAt": null
+}
+```
+
+Validation errors return `422` with `{ error }`. Bad JSON / oversized bodies
+return `400`. Missing ids or routes return `404`.
+
+Every response sets `Access-Control-Allow-Origin: *` so the Vite desktop app
+and mobile simulators can call it during development.
+
+---
+
+## B3. Persistence
+
+- An in-memory array is loaded once at startup from `DATA_FILE`
+  (default `server/data/tasks.json`; in Docker, `/data/tasks.json`).
+- Every mutating route serialises through a promise queue so concurrent writes
+  cannot clobber the file.
+- On-disk format: `{ "version": 1, "tasks": [...] }`. The loader also accepts a
+  bare array from earlier experiments.
+- A missing or unreadable file yields an empty board — the process still starts.
+
+---
+
+## B4. How to run it
+
+**Plain Node**
+
+```bash
+cd server && npm start
+```
+
+**Docker**
+
+```bash
+cd server && docker compose up -d --build
+```
+
+Compose publishes `4000:4000` and mounts a named volume at `/data`, so task data
+survives `docker compose down`. The image healthcheck hits `/health`.
+
+Both paths run the same `server.js`.
+
+---
+
+# Part C — How frontend and server connect
+
+They are deliberately *not* a monorepo workspace. The seam is one interface and
+one factory:
+
+```
+frontend                          server
+────────                          ──────
+TaskRepository (port)
+        │
+        ├── LocalTaskRepository   (default — no server needed)
+        └── HttpTaskRepository ──── fetch ──▶  GET/POST/PATCH/DELETE /tasks
+```
+
+`frontend/src/app/services/createServices.ts` is the only place that chooses:
+
+```ts
+const taskRepository =
+  config.dataSource === 'http'
+    ? new HttpTaskRepository({ baseUrl: config.apiBaseUrl })
+    : new LocalTaskRepository({ store: keyValueStore });
+```
+
+Environment flags (inlined by Metro Babel / Vite `define`):
+
+| Flag | Default | Effect |
+|---|---|---|
+| `TASKBOARD_DATA_SOURCE` | `local` | `http` selects the HTTP repository |
+| `TASKBOARD_API_URL` | `http://localhost:4000` | Base URL for `HttpTaskRepository` |
+
+Example:
+
+```bash
+# terminal 1
+cd server && docker compose up -d
+
+# terminal 2
+cd frontend && TASKBOARD_DATA_SOURCE=http npm run desktop
+# or: TASKBOARD_DATA_SOURCE=http npm run ios
+# or: TASKBOARD_DATA_SOURCE=http npm run android
+```
+
+No component, store, or domain file changes. That is the whole point of the
+repository port.
+
+### Packaged desktop caveat
+
+HTTP mode works from the Vite/Electron *dev* flow and from mobile. A *packaged*
+Electron app loads from `file://`, and Chromium blocks cross-origin `fetch`
+from there regardless of CORS headers — so the installable build stays on
+local storage. Use `npm run desktop` when demonstrating the API.

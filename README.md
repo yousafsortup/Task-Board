@@ -16,6 +16,49 @@ persists locally between restarts.
 
 ---
 
+## Why React Native (not Flutter)
+
+This project needed one codebase that could reach **phone and desktop**, with a
+layout that adapts by window size. React Native was the better fit for that
+brief than Flutter, for three practical reasons:
+
+1. **Community and hiring.** React / React Native sit on the largest frontend
+   ecosystem (npm, TypeScript, Jest, a huge pool of React engineers). Flutter is
+   production-ready, but the shared React skill graph is wider and maps directly
+   onto web and Electron work.
+2. **Same language family as desktop shelling.** This app’s desktop target is
+   Electron + `react-native-web`. Staying in React means one mental model for
+   components, state and tests across Metro (mobile) and Vite (desktop), instead
+   of Dart on mobile and a separate web stack.
+3. **Messaging products already ship this stack.** Several large communication
+   apps use React or React Native in production (see below). That is evidence the
+   stack scales past demos — not a claim that every chat app uses it.
+
+### What major messaging apps actually use (React / React Native only)
+
+Compiled from public engineering blogs and tech reporting.
+
+| App | Where React / React Native shows up |
+|---|---|
+| **Discord** | **React Native** on iOS and Android; desktop is **Electron + React / TypeScript** (same web client in a shell). Discord has published repeatedly on adopting and sticking with React Native. |
+| **Meta Messenger (desktop)** | Migrated **Messenger Desktop from Electron to React Native for Desktop** (Meta + Microsoft, 2023) — smaller binary, faster load, fewer crashes — while reusing most of the existing React JS. |
+| **Slack** | Desktop is **Electron** with a **React + Redux** UI (not React Native on mobile; mobile stays native). |
+| **Signal** | Desktop is **Electron** with a **React + Redux** UI; mobile clients are native. |
+
+**Accuracy note on Meta / Facebook:** Meta *created* React Native and uses it
+widely (including many surfaces in the main Facebook app). The well-documented
+Messenger rewrite that moved *to* React Native is **Messenger Desktop**, not the
+2020 mobile “LightSpeed” rewrite — that one was deliberately **native** (UIKit /
+platform UI + portable C), not React Native. So “Facebook rewrote Messenger to
+React Native” is only true for the desktop client, and that is how it is cited
+above.
+
+This repo follows a similar shape to Discord’s split: React Native for mobile,
+Electron for an installable desktop window, with as much UI logic shared as the
+tooling allows (`react-native-web` here).
+
+---
+
 ## 1. Before you start
 
 You need **Node 22.11.0 or newer** — React Native 0.86 will not run on older
@@ -137,11 +180,31 @@ If `adb` or Java are "not found", your terminal hasn't picked up those exports �
 `source ~/.zshrc` (or open a new terminal) and try again. `npx react-native doctor`
 is useful if something still looks wrong.
 
-To point the app at the optional HTTP API (section 5):
+### Pointing Android at the HTTP API
+
+Two traps bite Android specifically:
+
+1. **Metro must start with the env var.** `TASKBOARD_DATA_SOURCE` is inlined
+   when Metro bundles JS. If Metro is already running from a normal
+   `npm run android`, flipping the env on a second command does nothing —
+   stop Metro (Ctrl+C in its terminal, or free port 8083) and start fresh.
+2. **`localhost` is wrong inside the emulator.** On the AVD, `localhost` is the
+   emulator, not your Mac. The app defaults to `http://10.0.2.2:4000` on Android
+   (the emulator’s alias for the host). Use your Mac’s LAN IP for a USB device.
+
+With Docker (or `npm start` in `server/`) already serving `:4000`:
 
 ```bash
+# terminal 1 — Metro, with HTTP mode baked in
+cd frontend
+TASKBOARD_DATA_SOURCE=http npx react-native start --port 8083 --reset-cache
+
+# terminal 2 — install / launch on the emulator
+cd frontend
 TASKBOARD_DATA_SOURCE=http npm run android
 ```
+
+Quick check from the host that the API is up: `curl http://localhost:4000/health`.
 
 ---
 
@@ -182,7 +245,57 @@ TASKBOARD_DATA_SOURCE=http npm run ios
 ```
 
 ```bash
+# Android: Metro must start with this env (see section 4). Emulator uses 10.0.2.2 by default.
+TASKBOARD_DATA_SOURCE=http npx react-native start --port 8083 --reset-cache
+# then, in another terminal:
 TASKBOARD_DATA_SOURCE=http npm run android
+```
+
+### Run Android + iOS + desktop against the same Docker API
+
+One API process, three clients. They all share the same tasks.
+
+```
+┌─────────────┐   ┌──────────────┐   ┌──────────────┐
+│  iOS sim    │   │ Android AVD  │   │   Desktop    │
+│ localhost   │   │  10.0.2.2   │   │  localhost   │
+└──────┬──────┘   └──────┬───────┘   └──────┬───────┘
+       │                 │                  │
+       └────────────┬────┴──────────────────┘
+                    ▼
+           http://…:4000  (Docker or npm start)
+                    ▼
+              /data/tasks.json
+```
+
+Use **four terminals** (from `frontend/` except the API):
+
+```bash
+# 0 — API (from server/)
+cd server && docker compose up -d
+# or: cd server && npm start
+
+# 1 — Metro in HTTP mode (shared by iOS + Android)
+cd frontend && npm run start:http
+# first time after switching modes, prefer:
+# TASKBOARD_DATA_SOURCE=http npx react-native start --port 8083 --reset-cache
+
+# 2 — iOS
+cd frontend && npm run ios:http
+
+# 3 — Android
+cd frontend && npm run android:http
+
+# 4 — Desktop (own Vite process; does not use Metro)
+cd frontend && npm run desktop:http
+```
+
+Add a task on desktop → pull-to-refresh / reopen on phone → same board. Verify with:
+
+```bash
+curl http://localhost:4000/tasks
+# Docker volume:
+docker exec taskboard-api cat /data/tasks.json
 ```
 
 The app now reads and writes over HTTP instead of local storage. **No app code
