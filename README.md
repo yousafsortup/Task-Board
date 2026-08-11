@@ -8,9 +8,17 @@ persists locally between restarts.
 
 Walkthrough Recordings:
 Part1: https://www.loom.com/share/58d2b88cf98b476ba25aac670b225eeb
+
 Part2: https://www.loom.com/share/92478c60fb8249bc88838f4b288c6b5a
+
 Part3: https://www.loom.com/share/3fc3feffdb0748dab38c9ff3df849002
+
 Part4: https://www.loom.com/share/fd95fb0461fd44d8b12a0ba308809554
+
+Part 5 (Mac OS installer): https://www.loom.com/share/f1e0681ee13141e386bec9fb57d1d073
+
+Extra AI Integration / Auto-task creation from messages: https://www.loom.com/share/8a628b16b80f46428f5448bdd2638eb8
+
 
 | | |
 |---|---|
