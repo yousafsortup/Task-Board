@@ -519,26 +519,7 @@ rules testable without a simulator and identical across platforms.
 
 ---
 
-## 10. Assumptions and shortcuts
-
-Worth being upfront about:
-
-- **Desktop = Electron + react-native-web.** `react-native-macos` only supports
-  React Native up to 0.81, and this is 0.86 — so a native macOS fork wasn't
-  available. Electron gives a real, resizable desktop window and an installable
-  package from the same source tree.
-- **No task ordering by hand, no due dates, no categories.** The brief said
-  "nothing exotic" and I took that seriously; the effort went into the layout,
-  the architecture and the tests instead.
-- **Editing a task** happens in the detail view (pane on desktop, sheet on
-  phone) rather than inline in the list.
-- **The screenshots are seeded** with a fixed sample board so the iOS and
-  desktop shots show identical content and the comparison is purely about
-  layout. The seeding scripts are in `frontend/scripts/`.
-
----
-
-## 11. Bonuses attempted
+## 10. Bonuses attempted
 
 | Bonus | Status |
 |---|---|
